@@ -1,0 +1,5 @@
+frames 4
+fps 8
+sequence walk 0 3
+sequence idle 1 1
+rect feetrect 0 40 32 13
