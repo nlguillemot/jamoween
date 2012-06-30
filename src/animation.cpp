@@ -68,10 +68,10 @@ namespace alone
 	sf::IntRect Animation::anim_rect_relative() const
 	{
 		return sf::IntRect(
-			static_cast<int>(position().x),
-			static_cast<int>(position().y),
-			width(),
-			height()
+			position().x,
+			position().y,
+			position().x + width(),
+			position().y + height()
 			);
 	}
 	sf::IntRect Animation::anim_rect() const
@@ -187,7 +187,7 @@ namespace alone
 	{
 		int framewidth = sprite_.GetImage()->GetWidth() / total_frames_;
 		int frameheight = sprite_.GetImage()->GetHeight();
-		sf::IntRect clip(current_frame_ * framewidth , 0, framewidth, frameheight);
+		sf::IntRect clip(current_frame_ * framewidth, 0, (current_frame_+1) * framewidth, frameheight);
 		sprite_.SetSubRect(clip);
 	}
 }

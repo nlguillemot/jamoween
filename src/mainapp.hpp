@@ -105,9 +105,10 @@ namespace alone
 	class StringChangeSeqItem : public SequencerItem
 	{
 	public:
-		StringChangeSeqItem(sf::String& str, const std::vector<std::string>& textlist, sf::Uint32 time_between_texts);
+		StringChangeSeqItem(sf::Window& w, sf::String& str, const std::vector<std::string>& textlist, sf::Uint32 time_between_texts);
 		void update(sf::Uint32 dt);
 	private:
+		sf::Window& window_;
 		sf::String& str_;
 		const std::vector<std::string> textlist_;
 		sf::Uint32 time_between_texts_;

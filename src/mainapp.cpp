@@ -14,10 +14,16 @@ namespace alone
 		window.Create(sf::VideoMode(320,240),"Alone");
 		view = window.GetDefaultView();
 
-		icon_.LoadFromFile("assets/icon.png");
+		if (!icon_.LoadFromFile("assets/icon.png"))
+		{
+			std::cout << "Failed to load assets/icon.png" << std::endl;
+		}
 		window.SetIcon(icon_.GetWidth(), icon_.GetHeight(), icon_.GetPixelsPtr());
 		
-		despair_music_.OpenFromFile("assets/despair.ogg");
+		if (!despair_music_.OpenFromFile("assets/despair.ogg"))
+		{
+			std::cout << "Failed to load assets/despair.ogg" << std::endl;
+		}
 		despair_music_.SetLoop(true);
 		despair_music_.Play();
 
@@ -35,6 +41,9 @@ namespace alone
 		sf::Vector2i spawn_pos = background_->point_relative("playerspawn");
 		player_->set_position(sf::Vector2f(spawn_pos.x, spawn_pos.y));
 		add_depth_sorted_character(player_);
+
+		title_string_.SetSize(30);
+		title_string_.SetColor(sf::Color::Black);
 
 		flash_data_ = new AnimData("assets/flash");
 		flash_ = new Animation(*flash_data_);
@@ -145,7 +154,10 @@ namespace alone
 						if(overlay_->scale().x * overlay_->constant("radius") >= window.GetWidth()/2)
 						{
 							player_->wake_up();
-							bell_music_.OpenFromFile("assets/bells.ogg");
+							if (!bell_music_.OpenFromFile("assets/bells.ogg"))
+							{
+								std::cout << "Failed to load assets/bells.ogg" << std::endl;
+							}
 							bell_music_.SetLoop(true);
 
 							const std::string message = "You are not alone.";
@@ -154,12 +166,16 @@ namespace alone
 							{
 								messages.push_back(message.substr(0,i));
 							}
+							messages.push_back(message);
+							messages.push_back(message);
+							messages.push_back(message);
+							messages.push_back(message);
 							messages.push_back("");
 
 							flash_sequencer_.append(std::make_shared<FunctionSeqItem>(std::bind(&MainApp::set_transitioning,this,true)));
 							flash_sequencer_.append(std::make_shared<FunctionSeqItem>(std::bind(&Animation::set_alpha,flash_,255)));
 							flash_sequencer_.append(std::make_shared<FadeMusicSeqItem>(despair_music_,false,2000,true));
-							flash_sequencer_.append(std::make_shared<StringChangeSeqItem>(title_string_, messages, 600));
+							flash_sequencer_.append(std::make_shared<StringChangeSeqItem>(window, title_string_, messages, 600));
 							flash_sequencer_.append(std::make_shared<FadeMusicSeqItem>(bell_music_,true,2000,true));
 							flash_sequencer_.append(std::make_shared<FunctionSeqItem>(std::bind(&MainApp::set_transitioning,this,false)));
 							flash_sequencer_.append(std::make_shared<FadeAnimSeqItem>(*flash_,true,2000));
@@ -189,6 +205,8 @@ namespace alone
 			overlay_->set_position(view.GetCenter() - sf::Vector2f(overlay_->width()/2.0f,overlay_->height()/2.0f));
 		}
 		flash_->set_position(view.GetCenter() -  sf::Vector2f(flash_->width()/2.0f,flash_->height()/2.0f));
+
+		title_string_.SetPosition(view.GetCenter().x - title_string_.GetRect().GetWidth()/2, view.GetCenter().y - title_string_.GetRect().GetHeight()/2);
 	}
 	void MainApp::draw()
 	{
@@ -381,8 +399,9 @@ namespace alone
 		music_.SetVolume(current_volume_);
 	}
 
-	StringChangeSeqItem::StringChangeSeqItem(sf::String& str, const std::vector<std::string>& textlist, sf::Uint32 time_between_texts)
-		: str_(str),
+	StringChangeSeqItem::StringChangeSeqItem(sf::Window& w, sf::String& str, const std::vector<std::string>& textlist, sf::Uint32 time_between_texts)
+		: window_(w),
+		str_(str),
 		textlist_(textlist),
 		time_between_texts_(time_between_texts),
 		current_text_(-1), // will move to 0 when the first text is displayed

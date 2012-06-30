@@ -3,6 +3,7 @@
 #include <sstream>
 #include <cassert>
 #include <algorithm>
+#include <iostream>
 
 namespace alone
 {
@@ -16,7 +17,10 @@ namespace alone
 	void AnimData::load_texture(const std::string& file_name)
 	{
 		bool found = texture_.LoadFromFile(file_name + ".png");
-		assert(found);
+		if (!found)
+		{
+			std::cout << "Failed to load " << file_name << ".png" << std::endl;
+		}
 	}
 	void AnimData::load_properties(const std::string& file_name)
 	{
