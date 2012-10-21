@@ -1,186 +1,186 @@
 #include "player.hpp"
-#include "collision.hpp"
-#include <cassert>
+#include "util.hpp"
+#include <cmath>
 #include <iostream>
 
-namespace alone
+namespace hallow
 {
-	Player::Player(AnimData& anim_data)
-		: Character(anim_data),
-		woke_up_(false),
-		num_rescued_(0),
-		transitioning_(false)
+	class GoIntoDoorSeqItem : public SequencerItem
 	{
-		animation().hold("idle");
-	}
-	bool Player::handle_event(const sf::Event& e)
-	{
-		// pixels per second
-		const float velocity_magnitude = 100;
-		using namespace sf;
+	public:
+		GoIntoDoorSeqItem(Player& player, const sf::Vector2f& doorcenter):
+		player_(player),
+		target_(doorcenter),
+		time_limit_(1000),
+		time_accumulator_(0)
+		{
+		}
+		void update(sf::Uint32 dt)
+		{
+			time_accumulator_ += dt;
+			if (time_accumulator_ > time_limit_)
+			{
+				set_complete(true);
+			}
+			else
+			{
+				sf::Vector2f lerped = vector_LERP(player_.center_position(), target_, 0.05);
+				player_.set_center_position(lerped);
+			}
+		}
+		void exit()
+		{
+			player_.set_center_position(target_);
+		}
+	private:
+		Player& player_;
+		sf::Vector2f target_;
+		sf::Uint32 time_limit_;
+		sf::Uint32 time_accumulator_;
+	};
 
-		if(e.Type == sf::Event::KeyPressed)
-		{
-			switch(e.Key.Code)
-			{
-			case Key::Left:
-				set_vnx(-velocity_magnitude);
-				break;
-			case Key::Right:
-				set_vpx(velocity_magnitude);
-				break;
-			case Key::Up:
-				set_vny(-velocity_magnitude);
-				break;
-			case Key::Down:
-				set_vpy(velocity_magnitude);
-				break;
-			default:
-				break;
-			}
-			return true;
-		}
-		else if(e.Type == sf::Event::KeyReleased)
-		{
-			switch(e.Key.Code)
-			{
-			case Key::Left:
-				if(vn().x < 0) set_vnx(0);
-				break;
-			case Key::Right:
-				if(vp().x > 0) set_vpx(0);
-				break;
-			case Key::Up:
-				if(vn().y < 0) set_vny(0);
-				break;
-			case Key::Down:
-				if(vp().y > 0) set_vpy(0);
-				break;
-			default:
-				break;
-			}
-			return true;
-		}
-		else if(e.Type == sf::Event::LostFocus)
-		{
-			stop_movement();
-			return true;
-		}
-		return false;
+	Player::Player():
+	animdata_("assets/ethereal"),
+	animation_(animdata_),
+	current_passage_(0),
+	locked_input_(false),
+	transitioning_(false)
+	{
+		init();
+	}
+	void Player::init()
+	{
+		animation_.play("idle");
+		animation_.set_scale(3.f,3.f);
 	}
 	void Player::update(sf::Uint32 dt)
 	{
-		sf::Vector2f vel(velocity());
-		if(vel != sf::Vector2f(0,0))
+		action_sequencer_.update(dt);
+
+		time_accumulator_ += dt;
+		position_ += (velocity_ * static_cast<float>((dt/1000.0)));
+
+		float hover_period = 1500.f;
+
+		sf::Vector2f animpos = position_;
+		animpos.y += animation_.height()/4.f * sin(time_accumulator_/hover_period * 3.14);
+
+		animation_.set_position(animpos);
+		animation_.update(dt);
+	}
+	void Player::handle_event(const sf::Event& e)
+	{
+		sf::Key::Code key_left = sf::Key::Left;
+		sf::Key::Code key_right = sf::Key::Right;
+		sf::Key::Code key_up = sf::Key::Up;
+		const float walkspeed = 75.f;
+
+		// short circuit
+		if (transitioning_state() || locked_input())
 		{
-			if(!animation().playing())
-			{
-				animation().play("walk");
-			}
-			sf::Vector2f pos = animation().position();
-			sf::Vector2f previous_pos = pos;
-			pos.x += vel.x * dt / 1000;
-			pos.y += vel.y * dt / 1000;
-			
-			// restrict movement to play area
-			sf::IntRect feetRect = animation().rect("feetrect");
-			sf::FloatRect absfeetrect(feetRect.Left, feetRect.Top, feetRect.Right, feetRect.Bottom);
-			sf::FloatRect feetrect(pos.x + absfeetrect.Left, pos.y + absfeetrect.Top,absfeetrect.GetWidth(),absfeetrect.GetHeight());
+			return;
+		}
 
-			pos = CollisionResolver::resolve_inside_bounds(feetrect,sf::FloatRect(play_area_.Left, play_area_.Top, play_area_.Right, play_area_.Bottom));
-			pos -= sf::Vector2f(absfeetrect.Left,absfeetrect.Top);
-			
-			animation().set_position(pos);
-
-			if(vel.x < 0)
+		if (e.Type == sf::Event::KeyPressed)
+		{
+			if (e.Key.Code == key_left)
 			{
-				animation().fliph(false);
+				velocity_.x = -walkspeed;
 			}
-			else if(vel.x > 0)
+			else if (e.Key.Code == key_right)
 			{
-				animation().fliph(true);
+				velocity_.x = walkspeed;
+			}
+			else if (e.Key.Code == key_up)
+			{
+				if (current_passage_)
+				{
+					set_transitioning_state(true);
+					
+					action_sequencer_.append(
+						std::make_shared<FunctionSeqItem>(std::bind(&Player::set_velocity, this, sf::Vector2f(0,0))));
+					action_sequencer_.append(
+						std::make_shared<GoIntoDoorSeqItem>(*this, rect_center(current_passage_->first)));
+					action_sequencer_.append(
+						std::make_shared<FunctionSeqItem>(std::bind(&Player::set_transitioning_state, this, false)));
+				}
 			}
 		}
-		else
+		else if (e.Type == sf::Event::KeyReleased)
 		{
-			if(animation().playing())
+			if (e.Key.Code == key_left && velocity_.x < 0)
 			{
-				animation().hold("idle");
+				velocity_.x = 0.f;
+			}
+			else if (e.Key.Code == key_right && velocity_.x > 0)
+			{
+				velocity_.x = 0.f;
 			}
 		}
-		animation().update(dt);
 	}
-	void Player::stop_movement()
+	void Player::draw(sf::RenderTarget& target)
 	{
-		set_vp(sf::Vector2f(0,0));
-		set_vn(sf::Vector2f(0,0));
+		animation_.draw(target);
 	}
-	sf::Vector2f Player::velocity() const
+	const sf::Vector2f& Player::position() const
 	{
-		return vn() + vp();
+		return position_;
 	}
-	void Player::set_play_area(const sf::IntRect& rect)
+	void Player::set_position(const sf::Vector2f& position)
 	{
-		play_area_ = rect;
+		position_ = position;
 	}
-	sf::IntRect Player::collision_rect() const
+	sf::Vector2f Player::center_position() const
 	{
-		return animation().rect_relative("feetrect");
+		return position() + (rect_size(bounds())/2.f);
 	}
-	bool Player::awake() const
+	void Player::set_center_position(const sf::Vector2f& pos)
 	{
-		return woke_up_;
+		set_position(pos - (rect_size(bounds())/2.f));
 	}
-	void Player::wake_up()
+	const sf::Vector2f& Player::velocity() const
 	{
-		woke_up_ = true;
+		return velocity_;
 	}
-	void Player::add_rescue()
+	void Player::set_velocity(const sf::Vector2f& vel)
 	{
-		++num_rescued_;
+		velocity_ = vel;
 	}
-	int Player::rescued() const
+	sf::FloatRect Player::bounds() const
 	{
-		return num_rescued_;
+		return animation_.anim_rect();
 	}
-	bool Player::transitioning() const
+	sf::FloatRect Player::bounds_relative() const
+	{
+		return animation_.anim_rect_relative();
+	}
+	void Player::close_passage()
+	{
+		current_passage_ = 0;
+	}
+	void Player::set_passage(const sf::FloatRect& r, size_t index)
+	{
+		current_passage_data_ = std::pair<sf::FloatRect,size_t>(r,index);
+		current_passage_ = &current_passage_data_;
+	}
+	const std::pair<sf::FloatRect,size_t>* Player::maybe_current_passage() const
+	{
+		return current_passage_;
+	}
+	bool Player::transitioning_state() const
 	{
 		return transitioning_;
 	}
-	void Player::set_transitioning(bool state)
+	void Player::set_transitioning_state(bool state)
 	{
 		transitioning_ = state;
 	}
-	void Player::set_vp(const sf::Vector2f& vp)
+	bool Player::locked_input() const
 	{
-		velocity_positive_ = vp;
+		return locked_input_;
 	}
-	void Player::set_vpx(float vpx)
+	void Player::set_locked_input(bool state)
 	{
-		set_vp(sf::Vector2f(vpx,vp().y));
-	}
-	void Player::set_vpy(float vpy)
-	{
-		set_vp(sf::Vector2f(vp().x,vpy));
-	}
-	void Player::set_vn(const sf::Vector2f& vn)
-	{
-		velocity_negative_ = vn;
-	}
-	void Player::set_vnx(float vnx)
-	{
-		set_vn(sf::Vector2f(vnx,vn().y));
-	}
-	void Player::set_vny(float vny)
-	{
-		set_vn(sf::Vector2f(vn().x,vny));
-	}
-	sf::Vector2f Player::vn() const
-	{
-		return velocity_negative_;
-	}
-	sf::Vector2f Player::vp() const
-	{
-		return velocity_positive_;
+		locked_input_ = state;
 	}
 }

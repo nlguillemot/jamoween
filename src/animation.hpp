@@ -2,7 +2,7 @@
 #include <SFML/Graphics.hpp>
 #include "animdata.hpp"
 
-namespace alone
+namespace hallow
 {
 	class Animation
 	{
@@ -17,22 +17,24 @@ namespace alone
 		void hold(const std::string& sequence_name);
 		void hold(int frame);
 
-		sf::Vector2i point_relative(const std::string& point_name) const;
-		sf::Vector2i point(const std::string& point_name) const;
+		sf::Vector2f point_relative(const std::string& point_name) const;
+		sf::Vector2f point(const std::string& point_name) const;
 		
-		sf::IntRect rect_relative(const std::string& rect_name) const;
-		sf::IntRect rect(const std::string& rect_name) const;
+		sf::FloatRect rect_relative(const std::string& rect_name) const;
+		sf::FloatRect rect(const std::string& rect_name) const;
 
-		sf::IntRect anim_rect_relative() const;
-		sf::IntRect anim_rect() const;
+		sf::FloatRect anim_rect_relative() const;
+		sf::FloatRect anim_rect() const;
 
 		sf::Vector2f center_relative() const;
 		sf::Vector2f center() const;
 
 		float constant(const std::string& constant_name) const;
+
+		const std::string& string(const std::string& name) const;
 		
-		int width() const;
-		int height() const;
+		float width() const;
+		float height() const;
 
 		sf::Uint32 fps() const;
 		void set_fps(sf::Uint32 fps);

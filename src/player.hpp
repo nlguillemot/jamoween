@@ -1,54 +1,58 @@
 #pragma once
-#include "character.hpp"
+#include <SFML/Graphics.hpp>
+#include "animation.hpp"
+#include "animdata.hpp"
+#include "sequencer.hpp"
+#include <utility>
 
-namespace alone
+namespace hallow
 {
-	class Player : public Character
+	class Player
 	{
 	public:
-		Player(AnimData& anim_data);
+		Player();
 
-		bool handle_event(const sf::Event& e);
 		void update(sf::Uint32 dt);
+		void handle_event(const sf::Event& e);
+		void draw(sf::RenderTarget& target);
 
-		void stop_movement();
-		sf::Vector2f velocity() const;
+		// used to position the player initially. ffffff
+		const sf::Vector2f& position() const;
+		void set_position(const sf::Vector2f& position);
 
-		void set_play_area(const sf::IntRect& rect);
+		sf::Vector2f center_position() const;
+		void set_center_position(const sf::Vector2f& pos);
 
-		sf::IntRect collision_rect() const;
+		const sf::Vector2f& velocity() const;
+		void set_velocity(const sf::Vector2f& vel);
 
-		bool awake() const;
-		void wake_up();
+		sf::FloatRect bounds() const;
+		sf::FloatRect bounds_relative() const;
+		
+		void close_passage();
+		void set_passage(const sf::FloatRect& r, size_t index);
+		// rectangle of passage and its index
+		const std::pair<sf::FloatRect,size_t>* maybe_current_passage() const;
 
-		void add_rescue();
-		int rescued() const;
+		bool transitioning_state() const;
+		void set_transitioning_state(bool state);
 
-		bool transitioning() const;
-		void set_transitioning(bool state);
+		bool locked_input() const;
+		void set_locked_input(bool state);
 	private:
-		void set_vp(const sf::Vector2f& vp);
-		void set_vpx(float vpx);
-		void set_vpy(float vpy);
-		void set_vn(const sf::Vector2f& vn);
-		void set_vnx(float vnx);
-		void set_vny(float vny);
-		sf::Vector2f vn() const;
-		sf::Vector2f vp() const;
+		void init();
 
-		// These vectors decompose opposing movement velocities to make them possible to combine properly
-		// These are made to handle key presses. Need to add more vectors for other forces.
-		// covers -x and -y magnitudes
-		sf::Vector2f velocity_negative_;
-		// covers +x and +y magnitudes
-		sf::Vector2f velocity_positive_;
+		sf::Uint32 time_accumulator_;
+		sf::Vector2f position_;
+		sf::Vector2f velocity_;
+		AnimData animdata_;
+		Animation animation_;
 
-		// player not allowed to exit this rectangle
-		sf::IntRect play_area_;
+		std::pair<sf::FloatRect,size_t>* current_passage_;
+		std::pair<sf::FloatRect,size_t> current_passage_data_;
 
-		bool woke_up_;
-		int num_rescued_;
-
+		bool locked_input_;
 		bool transitioning_;
+		Sequencer action_sequencer_;
 	};
 }

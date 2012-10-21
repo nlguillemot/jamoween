@@ -1,75 +1,39 @@
 #include "mainapp.hpp"
 #include <SFML/Window/Event.hpp>
 #include "collision.hpp"
+#include "util.hpp"
+#include "room.hpp"
 #include <cassert>
 #include <iostream>
 
-namespace alone
+namespace hallow
 {
-	void MainApp::init()
+	MainApp::MainApp():
+	window_(sf::VideoMode(320,240),"Hallow"),
+	room_("redroom"),
+	room_transitioning_(false)
 	{
-		shadow_time_accumulator_ = 0;
-		end_game_ = false;
-
-		window.Create(sf::VideoMode(320,240),"Alone");
-		view = window.GetDefaultView();
-
-		if (!icon_.LoadFromFile("assets/icon.png"))
-		{
-			std::cout << "Failed to load assets/icon.png" << std::endl;
-		}
-		window.SetIcon(icon_.GetWidth(), icon_.GetHeight(), icon_.GetPixelsPtr());
-		
-		if (!despair_music_.OpenFromFile("assets/despair.ogg"))
-		{
-			std::cout << "Failed to load assets/despair.ogg" << std::endl;
-		}
-		despair_music_.SetLoop(true);
-		despair_music_.Play();
-
-		background_data_ = new AnimData("assets/street");
-		background_ = new Animation(*background_data_);
-		
-		overlay_data_ = new AnimData("assets/overlay_white");
-		overlay_ = new Animation(*overlay_data_);
-		overlay_->set_scale(0.5,0.5);
-		overlay_->set_tint(sf::Color::Black);
-
-		player_data_ = new AnimData("assets/player");
-		player_ = new Player(*player_data_);
-		player_->set_play_area(background_->rect_relative("arenabounds"));
-		sf::Vector2i spawn_pos = background_->point_relative("playerspawn");
-		player_->set_position(sf::Vector2f(spawn_pos.x, spawn_pos.y));
-		add_depth_sorted_character(player_);
-
-		title_string_.SetSize(30);
-		title_string_.SetColor(sf::Color::Black);
-
-		flash_data_ = new AnimData("assets/flash");
-		flash_ = new Animation(*flash_data_);
-		
-		player_->set_transitioning(true);
-		flash_->set_alpha(255);
-		flash_->set_tint(sf::Color::Black);
-		flash_sequencer_.append(std::make_shared<WaitSeqItem>(2000));
-		flash_sequencer_.append(std::make_shared<FadeAnimSeqItem>(*flash_,true,1000));
-		flash_sequencer_.append(std::make_shared<FunctionSeqItem>(std::bind(&Player::set_transitioning,player_,false)));
-		flash_sequencer_.append(std::make_shared<FunctionSeqItem>(std::bind(&Animation::set_tint,flash_,sf::Color::White)));
+		window_.Create(sf::VideoMode(320,240),"Hallow");
+		view_ = window_.GetDefaultView();
+		player_.set_position(room_.player_spawn_point());
+	}
+	MainApp::~MainApp()
+	{
 	}
 	void MainApp::exec()
 	{
-		window.SetFramerateLimit(60);
-		while(window.IsOpened())
+		window_.SetFramerateLimit(60);
+		while(window_.IsOpened())
 		{
 			poll_events();
-			update(1000 * window.GetFrameTime());
+			update(1000 * window_.GetFrameTime());
 			draw();
 		}
 	}
 	void MainApp::poll_events()
 	{
 		sf::Event e;
-		while(window.GetEvent(e))
+		while(window_.GetEvent(e))
 		{
 			handle_event(e);
 		}	
@@ -79,350 +43,145 @@ namespace alone
 		switch(e.Type)
 		{
 		case sf::Event::Closed:
-			window.Close();
+			window_.Close();
 			break;
 		default:
 			break;
 		}
-		player_->handle_event(e);
+
+		player_.handle_event(e);
 	}
 	void MainApp::update(sf::Uint32 dt)
 	{
-		flash_sequencer_.update(dt);
+		player_.update(dt);
+		transition_sequencer_.update(dt);
 
-		// Add shadows if necessary
-		shadow_time_accumulator_ += dt;
-		if( ( shadow_time_accumulator_ >= 1000 ) || (end_game_ && shadow_time_accumulator_ >= 100) )
+		if (!player_.transitioning_state() && !room_transitioning_state())
 		{
-			shadow_time_accumulator_ = 0;
-			Shadow::Direction dir = (rand()&1) ? Shadow::Left : Shadow::Right;
-			sf::Vector2f spawnpos;
-			if(dir == Shadow::Left)
+			size_t window_index;
+			const sf::FloatRect* wrect = room_.maybe_collide(player_.bounds_relative(), &window_index);
+			if (wrect)
 			{
-				spawnpos.x = static_cast<float>(background_->width() + 100);
+				player_.set_passage(*wrect,window_index);
 			}
 			else
 			{
-				spawnpos.x = static_cast<float>(-100);
+				player_.close_passage();
 			}
-			sf::IntRect arenabounds(background_->rect("arenabounds"));
-			int horizon = arenabounds.Top; 
-			spawnpos.y = static_cast<float>(horizon + rand()%(background_->height() - horizon - player_data_->texture().GetHeight()));
-			shadow_list_.push_back(std::make_shared<Shadow>(*player_data_,dir,spawnpos));
-			shadow_list_.back()->set_player_target(player_);
-			if(end_game_)
-			{
-				shadow_list_.back()->bring_to_life();
-			}
-			add_depth_sorted_character(shadow_list_.back().get());
 		}
 
-		player_->update(dt);
+		if (player_.transitioning_state() && !room_transitioning_state()) {
+			room_transitioning_ = true;
 
-		if(!end_game_ && player_->rescued() >= 15)
-		{
-			end_game_ = true;
-			for(auto it = shadow_list_.begin(); it != shadow_list_.end();++it)
-			{
-				(*it)->bring_to_life();
-			}
-			flash_sequencer_.append(std::make_shared<FadeAnimSeqItem>(*flash_,false,10000));
-			flash_sequencer_.append(std::make_shared<FunctionSeqItem>(std::bind(&MainApp::set_transitioning,this,true)));
-			flash_sequencer_.append(std::make_shared<FadeMusicSeqItem>(bell_music_,false,2000,true));
-			flash_sequencer_.append(std::make_shared<FunctionSeqItem>(std::bind(&sf::Music::Stop,&bell_music_)));
-			flash_sequencer_.append(std::make_shared<WaitSeqItem>(5000));
-			flash_sequencer_.append(std::make_shared<FunctionSeqItem>(std::bind(&sf::RenderWindow::Close,&window)));
-		}
+			auto fade_black = std::make_shared<sf::Shape>(sf::Shape::Rectangle(0,0,window_.GetWidth(), window_.GetHeight(),sf::Color::White));
+			fade_black->SetColor(sf::Color(255,255,255,0));
+			auto scope = transient_drawable_sequence(fade_black);
 
-		for(auto it = shadow_list_.begin(); it != shadow_list_.end();)
-		{
-			(*it)->update(dt);
-			if((*it)->queued_for_removal())
-			{
-				auto current_node = it;
-				it++;
-				remove_depth_sorted_character(current_node->get());
-				shadow_list_.erase(current_node);
-			}
-			else
-			{
-				if((*it)->started_vanishing())
-				{
-					if(!player_->awake())
+			scope->append(std::make_shared<FunctionSeqItem>(
+				std::bind(&Player::set_locked_input,&player_,true)));
+
+			scope->append(std::make_shared<DrawableColorTweenSeqItem>(
+				sf::Color(0,0,0,0), sf::Color::Black, 2000, *fade_black));
+
+			scope->append(std::make_shared<WaitUntilSeqItem>(
+				not_function(std::bind(&Player::transitioning_state,&player_))));
+
+			auto next_room_door_index = std::make_shared<size_t>();
+			scope->append(std::make_shared<FunctionSeqItem>(
+				std::bind(
+					[next_room_door_index](const std::function<size_t ()>& index_fn)
 					{
-						overlay_->set_scale(overlay_->scale() + sf::Vector2f(0.05f,0.05f));
-						if(overlay_->scale().x * overlay_->constant("radius") >= window.GetWidth()/2)
+						*next_room_door_index = index_fn();
+					},
+					[this]
+					{
+						size_t retval;
+						return *(this->room_.output_index_of_window(
+							this->player_.maybe_current_passage()->second,&retval));
+							
+					})));
+
+			scope->append(std::make_shared<FunctionSeqItem>(
+				curry<void,const std::string>(std::bind(&Room::switch_to_room, &room_, std::placeholders::_1),
+					curry<const std::string,size_t>(std::bind(&Room::room_behind_passage, &room_, std::placeholders::_1),
+					std::bind(
+						[](Player* p)
 						{
-							player_->wake_up();
-							if (!bell_music_.OpenFromFile("assets/bells.ogg"))
-							{
-								std::cout << "Failed to load assets/bells.ogg" << std::endl;
-							}
-							bell_music_.SetLoop(true);
+							return p->maybe_current_passage()->second;
+						}, &player_)))));
 
-							const std::string message = "You are not alone.";
-							std::vector<std::string> messages;
-							for(unsigned i = 0; i < message.size(); ++i)
-							{
-								messages.push_back(message.substr(0,i));
-							}
-							messages.push_back(message);
-							messages.push_back(message);
-							messages.push_back(message);
-							messages.push_back(message);
-							messages.push_back("");
+			scope->append(std::make_shared<FunctionSeqItem>(
+				curry<void,size_t>(
+					std::bind(&MainApp::set_player_position_to_index,this,std::placeholders::_1),
+					[next_room_door_index]{ return *next_room_door_index; })));
+				
 
-							flash_sequencer_.append(std::make_shared<FunctionSeqItem>(std::bind(&MainApp::set_transitioning,this,true)));
-							flash_sequencer_.append(std::make_shared<FunctionSeqItem>(std::bind(&Animation::set_alpha,flash_,255)));
-							flash_sequencer_.append(std::make_shared<FadeMusicSeqItem>(despair_music_,false,2000,true));
-							flash_sequencer_.append(std::make_shared<StringChangeSeqItem>(window, title_string_, messages, 600));
-							flash_sequencer_.append(std::make_shared<FadeMusicSeqItem>(bell_music_,true,2000,true));
-							flash_sequencer_.append(std::make_shared<FunctionSeqItem>(std::bind(&MainApp::set_transitioning,this,false)));
-							flash_sequencer_.append(std::make_shared<FadeAnimSeqItem>(*flash_,true,2000));
-							overlay_->set_tint(sf::Color::White);
-						}
-					}
-				}
-				++it;
-			}
+			scope->append(std::make_shared<DrawableColorTweenSeqItem>(
+				sf::Color::Black, sf::Color(0,0,0,0), 1000, *fade_black));
+
+			scope->append(std::make_shared<FunctionSeqItem>(
+				std::bind(&MainApp::set_room_transitioning_state,this,false)));
+
+			scope->append(std::make_shared<FunctionSeqItem>(
+				std::bind(&Player::set_locked_input,&player_,false)));
+
+			transition_sequencer_.append(scope);
 		}
-		
-		sf::Vector2f playercenter = player_->animation().center_relative();
-		sf::Vector2f camtopleft = playercenter - view.GetHalfSize();
-		sf::FloatRect camrect(camtopleft.x, camtopleft.y, camtopleft.x + view.GetRect().GetWidth(), camtopleft.y + view.GetRect().GetHeight());
-		sf::IntRect animrect = background_->anim_rect_relative();
-		camtopleft = CollisionResolver::resolve_inside_bounds(camrect,sf::FloatRect(animrect.Left, animrect.Top, animrect.Right, animrect.Bottom));
 
-		view.SetCenter(camtopleft + sf::Vector2f(static_cast<float>(window.GetWidth()/2),static_cast<float>(window.GetHeight()/2)));
-		window.SetView(view);
+		// I hate this block of code. a lot. compact it sometime.
+		sf::Vector2f playercenter = player_.position() + rect_size(player_.bounds())/2.f;
+		sf::Vector2f camtopleft = playercenter - view_.GetHalfSize();
+		sf::FloatRect camrect(camtopleft.x, camtopleft.y, camtopleft.x + view_.GetRect().GetWidth(), camtopleft.y + view_.GetRect().GetHeight());
+		sf::FloatRect background_animrect = room_.relative_bounds();
+		camtopleft = CollisionResolver::resolve_inside_bounds(camrect, sf::FloatRect(background_animrect.Left, background_animrect.Top, background_animrect.Right, background_animrect.Bottom));
 
-		if(!player_->awake())
-		{
-			overlay_->set_position(playercenter - sf::Vector2f(overlay_->width()/2.0f,overlay_->height()/2.0f));
-		}
-		else
-		{
-			overlay_->set_position(view.GetCenter() - sf::Vector2f(overlay_->width()/2.0f,overlay_->height()/2.0f));
-		}
-		flash_->set_position(view.GetCenter() -  sf::Vector2f(flash_->width()/2.0f,flash_->height()/2.0f));
-
-		title_string_.SetPosition(view.GetCenter().x - title_string_.GetRect().GetWidth()/2, view.GetCenter().y - title_string_.GetRect().GetHeight()/2);
+		view_.SetCenter(camtopleft + sf::Vector2f(static_cast<float>(window_.GetWidth()/2), static_cast<float>(window_.GetHeight()/2)));
+		window_.SetView(view_);
 	}
 	void MainApp::draw()
 	{
-		window.Clear(sf::Color::Black);
+		window_.Clear(sf::Color::Black);
 
-		background_->draw(window);
+		room_.draw(window_);
+		player_.draw(window_);
 
-		sort_characters_by_depth();
-		for(auto it = depth_sorted_characters_.begin(); it != depth_sorted_characters_.end(); ++it)
+		for (size_t i = 0; i < overlay_transients_.size(); i++)
 		{
-			(*it)->draw(window);
+			overlay_transients_[i]->SetPosition(rect_topleft(view_.GetRect()));
+			window_.Draw(*overlay_transients_[i]);
 		}
 
-		overlay_->draw(window);
+		window_.Display();
+	}
+	bool MainApp::room_transitioning_state() const
+	{
+		return room_transitioning_;
+	}
+	void MainApp::set_room_transitioning_state(bool state)
+	{
+		room_transitioning_ = state;
+	}
+	std::shared_ptr<ScopedSequenceSeqItem> MainApp::transient_drawable_sequence(const std::shared_ptr<sf::Drawable>& drawable)
+	{
+		auto scope =
+			std::make_shared<ScopedSequenceSeqItem>(
+				std::bind(
+					[drawable](std::vector<std::shared_ptr<sf::Drawable>>* transient_list)
+					{ 
+						transient_list->push_back(drawable);
+					},&overlay_transients_)
+				,std::bind(
+					[drawable](std::vector<std::shared_ptr<sf::Drawable>>* transient_list)
+					{
+						transient_list->erase(std::find(transient_list->begin(), transient_list->end(), drawable));
+					},&overlay_transients_));
+		return scope;
+	}
+	void MainApp::set_player_position_to_index(size_t index)
+	{
+		sf::Vector2f new_player_pos = 	
+			rect_center(*room_.maybe_passage_by_index(index));
 
-		flash_->draw(window);
-
-		window.Draw(title_string_);
-
-		window.Display();
-	}
-	void MainApp::add_depth_sorted_character(Character* character)
-	{
-		depth_sorted_characters_.push_back(character);
-	}
-	void MainApp::remove_depth_sorted_character(Character* character)
-	{
-		auto it = std::find(depth_sorted_characters_.begin(),depth_sorted_characters_.end(),character);
-		assert(it != depth_sorted_characters_.end());
-		depth_sorted_characters_.erase(it);
-	}
-	void MainApp::sort_characters_by_depth()
-	{
-		struct functor
-		{
-			static bool is_depth_deeper(Character* lhs, Character* rhs)
-			{
-				return lhs->position().y < rhs->position().y;
-			}
-		};
-
-		depth_sorted_characters_.sort(functor::is_depth_deeper);
-	}
-	bool MainApp::transitioning() const
-	{
-		return player_->transitioning();
-	}
-	void MainApp::set_transitioning(bool state)
-	{
-		player_->set_transitioning(state);
-	}
-	void MainApp::exit()
-	{
-		delete player_;
-		delete player_data_;
-
-		delete background_;
-		delete background_data_;
-
-		delete overlay_;
-		delete overlay_data_;
-
-		delete flash_;
-		delete flash_data_;
-	}
-
-	FadeAnimSeqItem::FadeAnimSeqItem(Animation& animation, bool fade_out, sf::Uint32 duration)
-		: animation_(animation),
-		fade_out_(fade_out),
-		duration_(duration)
-	{
-		if(fade_out_)
-		{
-			current_alpha_ = 255.0f;
-		}
-		else
-		{
-			current_alpha_ = 0.0f;
-		}
-	}
-	void FadeAnimSeqItem::init()
-	{
-		animation_.set_alpha(static_cast<sf::Uint8>(current_alpha_));
-	}
-	void FadeAnimSeqItem::update(sf::Uint32 dt)
-	{
-		const float delta_alpha = 256 * (static_cast<float>(dt) / duration_);
-		if(fade_out_)
-		{
-			current_alpha_ -= delta_alpha;
-		}
-		else
-		{
-			current_alpha_ += delta_alpha;
-		}
-		if( (fade_out_ && current_alpha_ <= -1) || (!fade_out_ && current_alpha_ >= 256) )
-		{
-			if(fade_out_)
-			{
-				animation_.set_alpha(0);
-			}
-			else
-			{
-				animation_.set_alpha(255);
-			}
-			set_complete(true);
-			return;
-		}
-		else
-		{
-			animation_.set_alpha(static_cast<sf::Uint8>(current_alpha_));
-		}
-	}
-
-	WaitSeqItem::WaitSeqItem(sf::Uint32 time)
-		: current_time_(0),
-		time_limit_(time)
-	{
-	}
-	void WaitSeqItem::update(sf::Uint32 dt)
-	{
-		current_time_ += dt;
-		if(current_time_ >= time_limit_)
-		{
-			set_complete(true);
-		}
-	}
-
-	FunctionSeqItem::FunctionSeqItem(const std::function<void ()>& function)
-		: function_(function)
-	{
-	}
-	void FunctionSeqItem::init()
-	{
-		function_();
-		set_complete(true);
-	}
-
-	FadeMusicSeqItem::FadeMusicSeqItem(sf::Music& music, bool fade_in, sf::Uint32 duration, bool make_start_or_stop)
-		: music_(music),
-		fade_in_(fade_in),
-		duration_(duration),
-		make_start_or_stop_(make_start_or_stop)
-	{
-	}
-	void FadeMusicSeqItem::init()
-	{
-		if(fade_in_)
-		{
-			current_volume_ = 0.0f;
-			if(!(music_.GetStatus() == sf::Sound::Playing))
-			{
-				music_.SetVolume(current_volume_);
-				if(make_start_or_stop_)
-				{
-					music_.Play();
-				}
-			}
-		}
-		else
-		{
-			current_volume_ = 100.0f;
-		}
-	}
-	void FadeMusicSeqItem::update(sf::Uint32 dt)
-	{
-		const float delta_volume = 100 * (static_cast<float>(dt) / duration_);
-		if(fade_in_)
-		{
-			current_volume_ += delta_volume;
-			if(current_volume_ >= 100.0f)
-			{
-				current_volume_ = 100.0f;
-				set_complete(true);
-			}
-		}
-		else
-		{
-			current_volume_ -= delta_volume;
-			if(current_volume_ <= 0.0f)
-			{
-				current_volume_ = 0;
-				if(make_start_or_stop_)
-				{
-					music_.Stop();
-				}
-				set_complete(true);
-			}
-		}
-		music_.SetVolume(current_volume_);
-	}
-
-	StringChangeSeqItem::StringChangeSeqItem(sf::Window& w, sf::String& str, const std::vector<std::string>& textlist, sf::Uint32 time_between_texts)
-		: window_(w),
-		str_(str),
-		textlist_(textlist),
-		time_between_texts_(time_between_texts),
-		current_text_(-1), // will move to 0 when the first text is displayed
-		time_accumulator_(time_between_texts) // will display first text immediately
-	{
-	}
-	void StringChangeSeqItem::update(sf::Uint32 dt)
-	{
-		time_accumulator_ += dt;
-		if(time_accumulator_ >= time_between_texts_)
-		{
-			time_accumulator_ = 0;
-			++current_text_;
-			if(current_text_ >= static_cast<int>(textlist_.size()))
-			{
-				set_complete(true);
-			}
-			else
-			{
-				str_.SetText(textlist_[current_text_]);
-			}
-		}
+		player_.set_center_position(new_player_pos);
 	}
 }

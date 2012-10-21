@@ -1,13 +1,9 @@
 #include "sequencer.hpp"
 
-namespace alone
+namespace hallow
 {
-	SequencerItem::pointer create(SequencerItem* item)
-	{
-		return std::shared_ptr<SequencerItem>(item);
-	}
-	SequencerItem::SequencerItem()
-		: complete_(false)
+	SequencerItem::SequencerItem():
+	complete_(false)
 	{
 	}
 	bool SequencerItem::complete() const
@@ -50,6 +46,10 @@ namespace alone
 				update_front(dt);
 			}
 		}
+	}
+	bool Sequencer::empty() const
+	{
+		return item_queue_.empty();
 	}
 	void Sequencer::update_front(sf::Uint32 dt)
 	{

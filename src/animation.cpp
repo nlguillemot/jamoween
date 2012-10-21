@@ -1,7 +1,7 @@
 #include "animation.hpp"
 #include <cassert>
 
-namespace alone
+namespace hallow
 {
 	Animation::Animation(AnimData& anim_data)
 		: anim_data_(anim_data),
@@ -46,37 +46,37 @@ namespace alone
 		timeline_ = frame_to_time(frame);
 		update_sprite_to_frame();
 	}
-	sf::Vector2i Animation::point_relative(const std::string& point_name) const
+	sf::Vector2f Animation::point_relative(const std::string& point_name) const
 	{
 		sf::Vector2f newpos = position();
-		sf::Vector2i animpos = anim_data_.point(point_name);
-		return sf::Vector2i(newpos.x + animpos.x, newpos.y + animpos.y);
+		sf::Vector2f animpos = anim_data_.point(point_name);
+		return sf::Vector2f(newpos.x + animpos.x, newpos.y + animpos.y);
 	}
-	sf::Vector2i Animation::point(const std::string& point_name) const
+	sf::Vector2f Animation::point(const std::string& point_name) const
 	{
 		return anim_data_.point(point_name);
 	}
-	sf::IntRect Animation::rect_relative(const std::string& rect_name) const
+	sf::FloatRect Animation::rect_relative(const std::string& rect_name) const
 	{
-		sf::IntRect rect = anim_data_.rect(rect_name);
-		return sf::IntRect(position().x + rect.Left, position().y + rect.Top, position().x + rect.Right, position().y + rect.Bottom);
+		sf::FloatRect rect = anim_data_.rect(rect_name);
+		return sf::FloatRect(position().x + rect.Left, position().y + rect.Top, position().x + rect.Right, position().y + rect.Bottom);
 	}
-	sf::IntRect Animation::rect(const std::string& rect_name) const
+	sf::FloatRect Animation::rect(const std::string& rect_name) const
 	{
 		return anim_data_.rect(rect_name);
 	}
-	sf::IntRect Animation::anim_rect_relative() const
+	sf::FloatRect Animation::anim_rect_relative() const
 	{
-		return sf::IntRect(
+		return sf::FloatRect(
 			position().x,
 			position().y,
 			position().x + width(),
 			position().y + height()
 			);
 	}
-	sf::IntRect Animation::anim_rect() const
+	sf::FloatRect Animation::anim_rect() const
 	{
-		return sf::IntRect(0, 0, width(), height());
+		return sf::FloatRect(0, 0, width(), height());
 	}
 	sf::Vector2f Animation::center_relative() const
 	{
@@ -90,13 +90,17 @@ namespace alone
 	{
 		return anim_data_.constant(constant_name);
 	}
-	int Animation::width() const
+	const std::string& Animation::string(const std::string& name) const
 	{
-		return static_cast<int>(sprite_.GetSubRect().GetWidth() * scale().x);
+		return anim_data_.string(name);
 	}
-	int Animation::height() const
+	float Animation::width() const
 	{
-		return static_cast<int>(sprite_.GetSubRect().GetHeight() * scale().y);
+		return static_cast<float>(sprite_.GetSubRect().GetWidth() * scale().x);
+	}
+	float Animation::height() const
+	{
+		return static_cast<float>(sprite_.GetSubRect().GetHeight() * scale().y);
 	}
 	sf::Uint32 Animation::fps() const
 	{
@@ -155,20 +159,20 @@ namespace alone
 	}
 	void Animation::update(sf::Uint32 dt)
 	{
-		if(playing_)
+		if (playing_)
 		{
 			int previous_frame = current_frame_;
 			timeline_ += dt;
-			if(timeline_ >= frame_to_time(current_frame_+1))
+			if (timeline_ >= frame_to_time(current_frame_+1))
 			{
 				++current_frame_;
 			}
-			if(current_frame_ > loop_end_)
+			if (current_frame_ > loop_end_)
 			{
 				current_frame_ = loop_start_;
 				timeline_ = frame_to_time(loop_start_);
 			}
-			if(previous_frame != current_frame_)
+			if (previous_frame != current_frame_)
 			{
 				update_sprite_to_frame();
 			}

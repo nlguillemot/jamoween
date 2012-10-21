@@ -2,8 +2,6 @@
 
 int main()
 {
-	alone::MainApp app;
-	app.init();
+	hallow::MainApp app;
 	app.exec();
-	app.exit();
 }

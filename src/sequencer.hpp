@@ -6,7 +6,7 @@
 #include <memory>
 #include <SFML/Config.hpp>
 
-namespace alone
+namespace hallow
 {
 // ----------------
 // SEQUENCER ITEM
@@ -15,8 +15,6 @@ namespace alone
 	{
 	public:
 		typedef std::shared_ptr<SequencerItem> pointer;
-		typedef std::weak_ptr<SequencerItem> weak_pointer;
-		static pointer create(SequencerItem* item);
 
 		SequencerItem();
 		virtual ~SequencerItem(){}
@@ -41,6 +39,7 @@ namespace alone
 		void append(const SequencerItem::pointer& item);
 		void append(const std::vector<SequencerItem::pointer>& items);
 		void update(sf::Uint32 dt);
+		bool empty() const;
 	private:
 		void update_front(sf::Uint32 dt);
 		std::queue<SequencerItem::pointer> item_queue_;

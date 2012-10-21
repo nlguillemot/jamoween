@@ -1,0 +1,8 @@
+fps 0
+point playerspawn 300 180
+rect window0 157 152 60 70
+rect window1 439 152 60 70
+string pathof0 redroom
+constant doorof0 0
+string pathof1 blueroom
+constant doorof1 0

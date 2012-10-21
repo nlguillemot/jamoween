@@ -1,9 +1,0 @@
-from glob import glob
-
-sources = glob("*.cpp")
-
-env = Environment()
-env.Append(LIBS = ['sfml-graphics', 'sfml-system', 'sfml-window', 'sfml-audio'])
-env.Append(CCFLAGS = ['-std=c++0x'])
-
-env.Program(target='alone', source=sources)

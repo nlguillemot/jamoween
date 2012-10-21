@@ -1,6 +1,6 @@
 #include "collision.hpp"
 
-namespace alone
+namespace hallow
 {
 	sf::Vector2f CollisionResolver::resolve_inside_bounds(const sf::FloatRect& within, const sf::FloatRect& bounds)
 	{

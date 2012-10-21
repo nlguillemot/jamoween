@@ -4,7 +4,7 @@
 #include <map>
 #include <SFML/Graphics.hpp>
 
-namespace alone
+namespace hallow
 {
 	class AnimSequence
 	{
@@ -28,9 +28,13 @@ namespace alone
 		int fps() const;
 		int total_frames() const;
 		const AnimSequence& sequence(const std::string& name) const;
-		const sf::Vector2i& point(const std::string& name) const;
-		const sf::IntRect& rect(const std::string& name) const;
-		float constant(const std::string& name) const;
+		const sf::Vector2f& point(const std::string& name) const;
+		const sf::FloatRect& rect(const std::string& name) const;
+		const sf::FloatRect* maybe_rect(const std::string& name) const;
+		const float& constant(const std::string& name) const;
+		const float* maybe_constant(const std::string& name) const;
+		const std::string& string(const std::string& name) const;
+		const std::string* maybe_string(const std::string& name) const;
 	private:
 		void load_texture(const std::string& file_name);
 		void load_properties(const std::string& file_name);
@@ -39,8 +43,9 @@ namespace alone
 		int fps_;
 		int total_frames_;
 		std::vector<AnimSequence> sequences_;
-		std::map<std::string,sf::Vector2i> points_;
-		std::map<std::string,sf::IntRect> rects_;
+		std::map<std::string,sf::Vector2f> points_;
+		std::map<std::string,sf::FloatRect> rects_;
 		std::map<std::string,float> constants_;
+		std::map<std::string,std::string> strings_;
 	};
 }
