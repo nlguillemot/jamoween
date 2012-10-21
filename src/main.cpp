@@ -12,7 +12,7 @@ int main()
 	sf::Vector2i screensize;
 	std::string firstroom;
 
-	std::ifstream ifs("assets/config.csv");
+	std::ifstream ifs("assets/config.dat");
 
 	if (!ifs)
 	{

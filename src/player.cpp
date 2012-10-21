@@ -73,7 +73,7 @@ namespace hallow
 		sf::Key::Code key_left = sf::Key::Left;
 		sf::Key::Code key_right = sf::Key::Right;
 		sf::Key::Code key_up = sf::Key::Up;
-		const float walkspeed = 75.f;
+		const float walkspeed = 175.f;
 
 		// short circuit
 		if (transitioning_state() || locked_input())

@@ -1,8 +1,8 @@
 fps 0
 point playerspawn 300 180
-rect window0 157 152 60 70
-rect window1 439 152 60 70
-string pathof0 redroom
+rect window0 60 140 90 90
+rect window1 1580 150 100 70
+string pathof0 earth
 constant doorof0 0
 string pathof1 outdoors
 constant doorof1 0
