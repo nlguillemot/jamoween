@@ -1,5 +1,5 @@
 fps 0
 point playerspawn 273 200
-rect window0 253 170 50 100
+rect window0 253 100 50 200
 string pathof0 blueroom
 constant doorof0 0
