@@ -12,7 +12,7 @@ namespace hallow
 	class MainApp
 	{
 	public:
-		MainApp();
+		MainApp(const sf::VideoMode& mode, const std::string& gametitle, const std::string& firstroom);
 		~MainApp();
 		void exec();
 	private:

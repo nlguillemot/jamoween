@@ -17,7 +17,6 @@ namespace hallow
 	}
 	void Room::switch_to_room(const std::string& room_name)
 	{
-		std::cout << "Switching to room: " << room_name << std::endl;
 		delete background_;
 		delete background_data_;
 
@@ -61,7 +60,6 @@ namespace hallow
 	}
 	std::string Room::room_behind_passage(size_t passage_index)
 	{
-		std::cout << "Asking for room behind " << passage_index << std::endl;
 		if (passage_index >= passages_.size())
 		{
 			return "";
@@ -70,11 +68,9 @@ namespace hallow
 		{
 			std::stringstream ss;
 			ss << "pathof" << passage_index;
-			std::cout << "Checking for string of roomname " << ss.str() << std::endl;
 			const std::string* roomname = background_data_->maybe_string(ss.str());
 			if (!roomname)
 			{
-				std::cout << "Could not find roomname" << std::endl;
 				return "";
 			}
 			else
@@ -100,7 +96,6 @@ namespace hallow
 	}
 	const sf::FloatRect* Room::maybe_passage_by_index(size_t window_index)
 	{
-		std::cout << "Asking for passage by index " << window_index << std::endl;;
 		if (window_index >= passages_.size())
 		{
 			return 0;

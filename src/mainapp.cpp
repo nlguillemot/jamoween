@@ -8,12 +8,11 @@
 
 namespace hallow
 {
-	MainApp::MainApp():
-	window_(sf::VideoMode(320,240),"Hallow"),
-	room_("redroom"),
+	MainApp::MainApp(const sf::VideoMode& mode, const std::string& gametitle, const std::string& firstroom):
+	window_(mode,gametitle),
+	room_(firstroom),
 	room_transitioning_(false)
 	{
-		window_.Create(sf::VideoMode(320,240),"Hallow");
 		view_ = window_.GetDefaultView();
 		player_.set_position(room_.player_spawn_point());
 	}
